@@ -149,15 +149,21 @@
             font-size: 0.7rem;
         }
 
-        button:active {
+        button:active:not(:disabled) {
             transform: translate(2px, 2px);
             box-shadow: none;
         }
 
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: 1px 1px 0px var(--inkColor);
+        }
+
         button.altBtn { background: var(--inkColor); color: white; }
         button.hintBtn { border-color: var(--accentColor); color: var(--accentColor); }
+        button.dangerBtn { border-color: #e74c3c; color: #e74c3c; margin-top: 15px; }
 
-        /* Ads Container */
         #adPlacement {
             margin-top: 15px;
             width: 100%;
@@ -182,7 +188,6 @@
             font-size: 0.5rem;
         }
 
-        /* Modals */
         .modalOverlay {
             position: fixed;
             inset: 0;
@@ -310,7 +315,7 @@
         </div>
 
         <div class="controls">
-            <button class="hintBtn" onclick="provideHint()">Get Hint</button>
+            <button id="hintBtn" class="hintBtn" onclick="provideHint()">Get Hint</button>
             <button onclick="resetCurrentLevel()">Undo All</button>
             <button onclick="newGame()">Reset App</button>
         </div>
@@ -320,7 +325,6 @@
             <button class="altBtn" onclick="toggleModal('aboutModal', true)">About</button>
         </div>
 
-        <!-- Ad Placeholder -->
         <div id="adPlacement">
             <div style="text-align: center;">
                 [ BANNER AD SLOT ]<br>
@@ -329,7 +333,6 @@
         </div>
     </div>
 
-    <!-- Win Modal -->
     <div id="winOverlay" class="modalOverlay">
         <div class="modalContent">
             <div class="modalTitle">SUM_MATCHED</div>
@@ -340,7 +343,6 @@
         </div>
     </div>
 
-    <!-- Help Modal -->
     <div id="helpModal" class="modalOverlay">
         <div class="modalContent">
             <div class="modalTitle">USER_GUIDE</div>
@@ -368,13 +370,12 @@
 
                 <div class="tutorialStep">Tap any number to strike it out.</div>
                 <div class="tutorialStep">Active numbers must satisfy both row and column targets.</div>
-                <div class="tutorialStep">Stuck? Use the <strong>Hint</strong> button for help!</div>
+                <div class="tutorialStep">Stuck? Use the <strong>Hint</strong> button (10s cooldown).</div>
             </div>
             <button onclick="toggleModal('helpModal', false)" style="width: 100%;">I UNDERSTAND</button>
         </div>
     </div>
 
-    <!-- About Modal -->
     <div id="aboutModal" class="modalOverlay">
         <div class="modalContent">
             <div class="modalTitle">SYSTEM_INFO</div>
@@ -386,7 +387,10 @@
                     <strong>PRITISH RAJPUROHIT</strong>
                 </div>
                 DEVELOPED BY: GEMINI<br>
-                <div id="aboutVersion">VERSION 1.4.0 (STABLE)</div>
+                <div id="aboutVersion">VERSION 1.4.2 (STABLE)</div>
+                
+                <!-- New Reset functionality button -->
+                <button class="dangerBtn" onclick="wipeAllData()" style="width: 100%;">WIPE ALL DATA</button>
             </div>
             <button onclick="toggleModal('aboutModal', false)" style="width: 100%;">CLOSE</button>
         </div>
@@ -398,15 +402,18 @@
         let gridSize = 3;
         let numbers = []; 
         let activeStates = []; 
-        let secretSolution = []; // Tracks correct state for hint system
+        let secretSolution = []; 
         let rowTargets = [];
         let colTargets = [];
+        let hintCooldown = 0;
+        let hintTimer = null;
 
         const gridEl = document.getElementById('gameGrid');
         const lvlEl = document.getElementById('currentLevelText');
         const highEl = document.getElementById('highScoreText');
         const sizeEl = document.getElementById('gridSizeText');
         const winOverlay = document.getElementById('winOverlay');
+        const hintBtn = document.getElementById('hintBtn');
 
         function init() {
             highEl.innerText = highScore;
@@ -428,7 +435,6 @@
             level = lvl;
             lvlEl.innerText = level;
             
-            // New Scaling Logic
             if (level <= 3) gridSize = 3;
             else if (level <= 8) gridSize = 4;
             else if (level <= 15) gridSize = 5;
@@ -449,7 +455,6 @@
                 secretSolution.push(Math.random() > 0.4); 
             }
 
-            // Ensure valid targets
             for (let r = 0; r < gridSize; r++) {
                 let rowHasActive = false;
                 for (let c = 0; c < gridSize; c++) if (secretSolution[r * gridSize + c]) rowHasActive = true;
@@ -482,7 +487,6 @@
             gridEl.style.gridTemplateColumns = 'repeat(' + (gridSize + 1) + ', auto)';
             gridEl.innerHTML = '';
 
-            // Dynamic cell size based on grid dimension to fit mobile screen
             let cellWidth = 55;
             if (gridSize === 4) cellWidth = 45;
             else if (gridSize === 5) cellWidth = 38;
@@ -502,7 +506,6 @@
                         el.innerText = numbers[idx];
                         el.onclick = () => toggleNumber(idx);
                         
-                        // Smaller font for large grids
                         if (gridSize >= 6) el.style.fontSize = '0.9rem';
                     } 
                     else if (r < gridSize && c === gridSize) {
@@ -549,7 +552,8 @@
         }
 
         function provideHint() {
-            // Find all indices where current state differs from secret solution
+            if (hintCooldown > 0) return;
+
             let wrongIndices = [];
             for (let i = 0; i < activeStates.length; i++) {
                 if (activeStates[i] !== secretSolution[i]) {
@@ -558,19 +562,38 @@
             }
 
             if (wrongIndices.length > 0) {
-                // Pick a random incorrect cell and fix it
                 const randomIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
                 activeStates[randomIdx] = secretSolution[randomIdx];
                 render();
                 
-                // Visual feedback on the hinted cell
                 const cellEl = document.getElementById('cell' + randomIdx);
                 if (cellEl) {
                     cellEl.classList.add('hinted');
                     setTimeout(() => cellEl.classList.remove('hinted'), 1500);
                 }
+                
+                startHintCooldown();
                 checkWin();
             }
+        }
+
+        function startHintCooldown() {
+            hintCooldown = 10;
+            hintBtn.disabled = true;
+            hintBtn.innerText = 'WAIT ' + hintCooldown + 'S';
+            
+            if (hintTimer) clearInterval(hintTimer);
+            
+            hintTimer = setInterval(() => {
+                hintCooldown--;
+                if (hintCooldown <= 0) {
+                    clearInterval(hintTimer);
+                    hintBtn.disabled = false;
+                    hintBtn.innerText = 'GET HINT';
+                } else {
+                    hintBtn.innerText = 'WAIT ' + hintCooldown + 'S';
+                }
+            }, 1000);
         }
 
         function checkWin() {
@@ -605,10 +628,16 @@
             }
         }
 
+        function wipeAllData() {
+            if (confirm("WIPE ALL DATA? THIS WILL PERMANENTLY CLEAR YOUR HIGH SCORE AND TUTORIAL STATUS.")) {
+                localStorage.removeItem('sumCrackHigh');
+                localStorage.removeItem('sumCrackTutorialSeen');
+                location.reload();
+            }
+        }
+
         init();
     </script>
-
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9956204411945910"
-     crossorigin="anonymous"></script>
+    <script src="adsense-script.js"></script>
 </body>
 </html>
