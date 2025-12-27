@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUMCRACK Logic Puzzle</title>
+    <style>
+        :root {
+            --bgColor: #fdfdfd;
+            --inkColor: #222222;
+            --dimColor: #bdc3c7;
+            --activeColor: #ffffff;
+            --disabledColor: #f0f0f0;
+            --accentColor: #3498db;
+            --successColor: #27ae60;
+            --fontMono: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--fontMono);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bgColor);
+            color: var(--inkColor);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #appWrapper {
+            width: 100%;
+            max-width: 450px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+
+        header {
+            border-bottom: 2px solid var(--inkColor);
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .titleBlock h1 { font-size: 1.1rem; font-weight: 900; }
+        .stats { font-size: 0.75rem; font-weight: bold; }
+
+        #boardContainer {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 10px 0;
+        }
+
+        #gameGrid {
+            display: grid;
+            gap: 4px;
+            padding: 8px;
+            background: white;
+            border: 2px solid var(--inkColor);
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
+        }
+
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border: 1px solid var(--dimColor);
+            cursor: pointer;
+            background: var(--activeColor);
+            transition: all 0.1s;
+        }
+
+        .cell.disabled {
+            background: var(--disabledColor);
+            color: var(--dimColor);
+            text-decoration: line-through;
+            border-style: dashed;
+        }
+
+        .cell.hinted {
+            animation: pulseHint 1.5s infinite;
+            border: 2px solid var(--accentColor);
+        }
+
+        @keyframes pulseHint {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); background: #e1f5fe; }
+            100% { transform: scale(1); }
+        }
+
+        .targetCell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            background: #eee;
+            border: 1px solid var(--inkColor);
+        }
+
+        .targetValue {
+            font-size: 0.95rem;
+            color: var(--accentColor);
+        }
+
+        .targetValue.satisfied {
+            color: var(--successColor);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .infoControls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        button {
+            padding: 8px;
+            background: white;
+            border: 2px solid var(--inkColor);
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 2px 2px 0px var(--inkColor);
+            text-transform: uppercase;
+            font-size: 0.7rem;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+
+        button.altBtn { background: var(--inkColor); color: white; }
+        button.hintBtn { border-color: var(--accentColor); color: var(--accentColor); }
+
+        /* Ads Container */
+        #adPlacement {
+            margin-top: 15px;
+            width: 100%;
+            height: 60px;
+            background: #f0f0f0;
+            border: 1px dashed var(--dimColor);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 0.6rem;
+            position: relative;
+        }
+
+        #adPlacement::before {
+            content: "SPONSORED ADVERTISEMENT";
+            position: absolute;
+            top: -10px;
+            left: 5px;
+            background: var(--bgColor);
+            padding: 0 5px;
+            font-size: 0.5rem;
+        }
+
+        /* Modals */
+        .modalOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.98);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .modalOverlay.active { display: flex; }
+
+        .modalContent {
+            width: 100%;
+            max-width: 400px;
+            border: 3px solid var(--inkColor);
+            padding: 20px;
+            background: white;
+            box-shadow: 6px 6px 0px var(--inkColor);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modalTitle {
+            font-size: 1.5rem;
+            font-weight: 900;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--inkColor);
+            display: inline-block;
+        }
+
+        .modalBody {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .tutorialStep {
+            margin-bottom: 8px;
+            padding-left: 18px;
+            position: relative;
+        }
+
+        .tutorialStep::before {
+            content: '>';
+            position: absolute;
+            left: 0;
+            color: var(--accentColor);
+            font-weight: bold;
+        }
+
+        .visualSample {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px dashed var(--inkColor);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sampleRow {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .sampleCell {
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--inkColor);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .sampleCell.crossed {
+            background: #eee;
+            color: #999;
+            text-decoration: line-through;
+            border-style: dashed;
+        }
+
+        .sampleTarget {
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--accentColor);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            color: var(--accentColor);
+            font-size: 0.7rem;
+        }
+
+        .sampleTarget.match { border-color: var(--successColor); color: var(--successColor); }
+
+        #aboutVersion { font-size: 0.7rem; opacity: 0.6; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="appWrapper">
+        <header>
+            <div class="titleBlock">
+                <h1>SUM_CRACK</h1>
+                <div class="stats">BEST: <span id="highScoreText">0</span></div>
+            </div>
+            <div class="stats" style="text-align: right;">
+                LVL: <span id="currentLevelText">1</span><br>
+                SIZE: <span id="gridSizeText">3x3</span>
+            </div>
+        </header>
+
+        <div id="boardContainer">
+            <div id="gameGrid"></div>
+        </div>
+
+        <div class="controls">
+            <button class="hintBtn" onclick="provideHint()">Get Hint</button>
+            <button onclick="resetCurrentLevel()">Undo All</button>
+            <button onclick="newGame()">Reset App</button>
+        </div>
+
+        <div class="infoControls">
+            <button class="altBtn" onclick="toggleModal('helpModal', true)">How to Play</button>
+            <button class="altBtn" onclick="toggleModal('aboutModal', true)">About</button>
+        </div>
+
+        <!-- Ad Placeholder -->
+        <div id="adPlacement">
+            <div style="text-align: center;">
+                [ BANNER AD SLOT ]<br>
+                320 x 50 / 468 x 60
+            </div>
+        </div>
+    </div>
+
+    <!-- Win Modal -->
+    <div id="winOverlay" class="modalOverlay">
+        <div class="modalContent">
+            <div class="modalTitle">SUM_MATCHED</div>
+            <div class="modalBody" style="text-align: center;">
+                Sequence verified.<br>Grid logic balanced.
+            </div>
+            <button onclick="startNextLevel()" style="width: 100%;">NEXT LEVEL</button>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modalOverlay">
+        <div class="modalContent">
+            <div class="modalTitle">USER_GUIDE</div>
+            <div class="modalBody">
+                <div class="tutorialStep">Goal: Deactivate numbers so the active ones sum up to the target values.</div>
+                
+                <div class="visualSample">
+                    <div style="font-size: 0.6rem; font-weight: bold;">EXAMPLE: TARGET IS 5</div>
+                    <div class="sampleRow">
+                        <div class="sampleCell">5</div>
+                        <div class="sampleCell">+</div>
+                        <div class="sampleCell">2</div>
+                        <div style="font-size: 1rem;">=</div>
+                        <div class="sampleTarget">5</div>
+                    </div>
+                    <div style="font-size: 0.5rem; opacity: 0.7;">TAP '2' TO DEACTIVATE IT</div>
+                    <div class="sampleRow">
+                        <div class="sampleCell">5</div>
+                        <div class="sampleCell">+</div>
+                        <div class="sampleCell crossed">2</div>
+                        <div style="font-size: 1rem;">=</div>
+                        <div class="sampleTarget match">5✓</div>
+                    </div>
+                </div>
+
+                <div class="tutorialStep">Tap any number to strike it out.</div>
+                <div class="tutorialStep">Active numbers must satisfy both row and column targets.</div>
+                <div class="tutorialStep">Stuck? Use the <strong>Hint</strong> button for help!</div>
+            </div>
+            <button onclick="toggleModal('helpModal', false)" style="width: 100%;">I UNDERSTAND</button>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modalOverlay">
+        <div class="modalContent">
+            <div class="modalTitle">SYSTEM_INFO</div>
+            <div class="modalBody" style="text-align: center;">
+                <strong>SUM_CRACK</strong><br>
+                Logical Deduction Protocol<br><br>
+                <div style="margin-bottom: 10px;">
+                    <span style="font-size: 0.7rem; opacity: 0.7;">CONCEIVED BY THE VISIONARY</span><br>
+                    <strong>PRITISH RAJPUROHIT</strong>
+                </div>
+                DEVELOPED BY: GEMINI<br>
+                <div id="aboutVersion">VERSION 1.4.0 (STABLE)</div>
+            </div>
+            <button onclick="toggleModal('aboutModal', false)" style="width: 100%;">CLOSE</button>
+        </div>
+    </div>
+
+    <script>
+        let level = 1;
+        let highScore = localStorage.getItem('sumCrackHigh') || 1;
+        let gridSize = 3;
+        let numbers = []; 
+        let activeStates = []; 
+        let secretSolution = []; // Tracks correct state for hint system
+        let rowTargets = [];
+        let colTargets = [];
+
+        const gridEl = document.getElementById('gameGrid');
+        const lvlEl = document.getElementById('currentLevelText');
+        const highEl = document.getElementById('highScoreText');
+        const sizeEl = document.getElementById('gridSizeText');
+        const winOverlay = document.getElementById('winOverlay');
+
+        function init() {
+            highEl.innerText = highScore;
+            loadLevel(level);
+            
+            if (!localStorage.getItem('sumCrackTutorialSeen')) {
+                toggleModal('helpModal', true);
+                localStorage.setItem('sumCrackTutorialSeen', 'true');
+            }
+        }
+
+        function toggleModal(id, show) {
+            const el = document.getElementById(id);
+            if (show) el.classList.add('active');
+            else el.classList.remove('active');
+        }
+
+        function loadLevel(lvl) {
+            level = lvl;
+            lvlEl.innerText = level;
+            
+            // New Scaling Logic
+            if (level <= 3) gridSize = 3;
+            else if (level <= 8) gridSize = 4;
+            else if (level <= 15) gridSize = 5;
+            else if (level <= 25) gridSize = 6;
+            else gridSize = 7;
+
+            sizeEl.innerText = gridSize + 'x' + gridSize;
+            generatePuzzle();
+            render();
+        }
+
+        function generatePuzzle() {
+            numbers = [];
+            secretSolution = [];
+            
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                numbers.push(Math.floor(Math.random() * 9) + 1);
+                secretSolution.push(Math.random() > 0.4); 
+            }
+
+            // Ensure valid targets
+            for (let r = 0; r < gridSize; r++) {
+                let rowHasActive = false;
+                for (let c = 0; c < gridSize; c++) if (secretSolution[r * gridSize + c]) rowHasActive = true;
+                if (!rowHasActive) secretSolution[r * gridSize + Math.floor(Math.random() * gridSize)] = true;
+            }
+
+            rowTargets = [];
+            colTargets = [];
+
+            for (let r = 0; r < gridSize; r++) {
+                let rSum = 0;
+                for (let c = 0; c < gridSize; c++) {
+                    if (secretSolution[r * gridSize + c]) rSum += numbers[r * gridSize + c];
+                }
+                rowTargets.push(rSum);
+            }
+
+            for (let c = 0; c < gridSize; c++) {
+                let cSum = 0;
+                for (let r = 0; r < gridSize; r++) {
+                    if (secretSolution[r * gridSize + c]) cSum += numbers[r * gridSize + c];
+                }
+                colTargets.push(cSum);
+            }
+
+            activeStates = Array(gridSize * gridSize).fill(true);
+        }
+
+        function render() {
+            gridEl.style.gridTemplateColumns = 'repeat(' + (gridSize + 1) + ', auto)';
+            gridEl.innerHTML = '';
+
+            // Dynamic cell size based on grid dimension to fit mobile screen
+            let cellWidth = 55;
+            if (gridSize === 4) cellWidth = 45;
+            else if (gridSize === 5) cellWidth = 38;
+            else if (gridSize === 6) cellWidth = 32;
+            else if (gridSize >= 7) cellWidth = 28;
+
+            for (let r = 0; r < gridSize + 1; r++) {
+                for (let c = 0; c < gridSize + 1; c++) {
+                    const el = document.createElement('div');
+                    el.style.width = cellWidth + 'px';
+                    el.style.height = cellWidth + 'px';
+
+                    if (r < gridSize && c < gridSize) {
+                        const idx = r * gridSize + c;
+                        el.className = 'cell' + (activeStates[idx] ? '' : ' disabled');
+                        el.id = 'cell' + idx;
+                        el.innerText = numbers[idx];
+                        el.onclick = () => toggleNumber(idx);
+                        
+                        // Smaller font for large grids
+                        if (gridSize >= 6) el.style.fontSize = '0.9rem';
+                    } 
+                    else if (r < gridSize && c === gridSize) {
+                        el.className = 'targetCell';
+                        const currentSum = calculateRowSum(r);
+                        const isOk = currentSum === rowTargets[r];
+                        el.innerHTML = '<span class="targetValue ' + (isOk ? 'satisfied' : '') + '">' + rowTargets[r] + (isOk ? '✓' : '') + '</span>';
+                    }
+                    else if (r === gridSize && c < gridSize) {
+                        el.className = 'targetCell';
+                        const currentSum = calculateColSum(c);
+                        const isOk = currentSum === colTargets[c];
+                        el.innerHTML = '<span class="targetValue ' + (isOk ? 'satisfied' : '') + '">' + colTargets[c] + (isOk ? '✓' : '') + '</span>';
+                    }
+                    else {
+                        el.style.border = 'none';
+                    }
+
+                    gridEl.appendChild(el);
+                }
+            }
+        }
+
+        function calculateRowSum(r) {
+            let sum = 0;
+            for (let c = 0; c < gridSize; c++) {
+                if (activeStates[r * gridSize + c]) sum += numbers[r * gridSize + c];
+            }
+            return sum;
+        }
+
+        function calculateColSum(c) {
+            let sum = 0;
+            for (let r = 0; r < gridSize; r++) {
+                if (activeStates[r * gridSize + c]) sum += numbers[r * gridSize + c];
+            }
+            return sum;
+        }
+
+        function toggleNumber(idx) {
+            activeStates[idx] = !activeStates[idx];
+            render();
+            checkWin();
+        }
+
+        function provideHint() {
+            // Find all indices where current state differs from secret solution
+            let wrongIndices = [];
+            for (let i = 0; i < activeStates.length; i++) {
+                if (activeStates[i] !== secretSolution[i]) {
+                    wrongIndices.push(i);
+                }
+            }
+
+            if (wrongIndices.length > 0) {
+                // Pick a random incorrect cell and fix it
+                const randomIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
+                activeStates[randomIdx] = secretSolution[randomIdx];
+                render();
+                
+                // Visual feedback on the hinted cell
+                const cellEl = document.getElementById('cell' + randomIdx);
+                if (cellEl) {
+                    cellEl.classList.add('hinted');
+                    setTimeout(() => cellEl.classList.remove('hinted'), 1500);
+                }
+                checkWin();
+            }
+        }
+
+        function checkWin() {
+            const rowsOk = rowTargets.every((target, r) => calculateRowSum(r) === target);
+            const colsOk = colTargets.every((target, c) => calculateColSum(c) === target);
+
+            if (rowsOk && colsOk) {
+                if (level >= highScore) {
+                    highScore = level;
+                    localStorage.setItem('sumCrackHigh', highScore);
+                    highEl.innerText = highScore;
+                }
+                setTimeout(() => {
+                    winOverlay.classList.add('active');
+                }, 300);
+            }
+        }
+
+        function startNextLevel() {
+            winOverlay.classList.remove('active');
+            loadLevel(level + 1);
+        }
+
+        function resetCurrentLevel() {
+            activeStates = Array(gridSize * gridSize).fill(true);
+            render();
+        }
+
+        function newGame() {
+            if (confirm("START OVER FROM LEVEL 1?")) {
+                loadLevel(1);
+            }
+        }
+
+        init();
+    </script>
+
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9956204411945910"
+     crossorigin="anonymous"></script>
+</body>
+</html>
